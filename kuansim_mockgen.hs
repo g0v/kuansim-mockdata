@@ -1,5 +1,5 @@
 #!/usr/bin/runghc 
-{-# LANGUAGE FlexibleInstances, OverloadedStrings, UndecidableInstances, DeriveGeneric #-} 
+{-# LANGUAGE FlexibleInstances, OverloadedStrings, UndecidableInstances, DeriveGeneric, DeriveDataTypeable#-} 
 import qualified Data.ByteString.UTF8 as BSUTF8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
@@ -8,51 +8,49 @@ import Test.QuickCheck
 import Test.QuickCheck.Gen
 import System.Random
 import System.Environment
-import qualified Data.Vector as V
-import Data.Csv
 import Data.Data
+import Data.Aeson
+import Data.Typeable
 import GHC.Generics
 
 chichars_surname = map BSUTF8.fromString $ words "李 王 張 劉 陳 楊 黃 趙 周 吳 徐 孫 朱 馬 胡 郭 林 何 高 梁 鄭 羅 宋 謝 唐 韓 曹 許 鄧 蕭 馮 曾 程 蔡 彭 潘 袁 於 董 餘 蘇 葉 呂 魏 蔣 田 杜 丁 沈 姜 範 江 傅 鐘 盧 汪 戴 崔 任 陸 廖 姚 方 金 邱 夏 譚 韋 賈 鄒 石 熊 孟 秦 閻 薛 侯 雷 白 龍 段 郝 孔 邵 史 毛 常 萬 顧 賴 武 康 賀 嚴 尹 錢 施 牛 洪 龔"
 chichars_givenname = map BSUTF8.fromString $ words "世 中 仁 伶 佩 佳 俊 信 倫 偉 傑 儀 元 冠 凱 君 哲 嘉 國 士 如 娟 婷 子 孟 宇 安 宏 宗 宜 家 建 弘 強 彥 彬 德 心 志 忠 怡 惠 慧 慶 憲 成 政 敏 文 昌 明 智 曉 柏 榮 欣 正 民 永 淑 玉 玲 珊 珍 珮 琪 瑋 瑜 瑞 瑩 盈 真 祥 秀 秋 穎 立 維 美 翔 翰 聖 育 良 芬 芳 英 菁 華 萍 蓉 裕 豪 貞 賢 郁 鈴 銘 雅 雯 霖 青 靜 韻 鴻 麗 龍" 
 
-data UserPrefers = UserPrefers
-    { prefer_poston :: BSUTF8.ByteString }
-    deriving Generic
-
-instance Arbitrary UserPrefers where
-    arbitrary = liftM UserPrefers poston
-        where poston = elements ["facebook", "twitter", "plurk", "googleplus"]
-
-data GiveName = GiveName [BSUTF8.ByteString]
-              deriving Generic
-
-instance Arbitrary GiveName where
-    arbitrary = do 
-      k <- choose (1, 2)
-      a <- vectorOf k $ elements chichars_givenname 
-      return (GiveName a)
-                              
 data User = User 
     { surename :: BSUTF8.ByteString
     , givename :: GiveName
     , prefs :: UserPrefers} 
-            deriving Generic
+            deriving (Generic, Data,Typeable,Show)
 
+data GiveName = GiveName [BSUTF8.ByteString]
+              deriving (Generic, Data,Typeable,Show)
+-- Generator
 instance Arbitrary User where
     arbitrary = liftM3 User surename arbitrary arbitrary
             where surename = elements chichars_surname
 
--- CSV 
-instance ToField GiveName where
-    toField (GiveName lst) = BS.concat lst
-instance ToField UserPrefers where 
-    toField (UserPrefers prefer_poston) = prefer_poston
-instance ToNamedRecord User
+data UserPrefers = UserPrefers
+    { prefer_poston :: BSUTF8.ByteString }
+    deriving (Data,Typeable,Show, Generic)
+
+instance Arbitrary GiveName where
+    arbitrary = do
+      k <- choose (1, 2)
+      a <- vectorOf k $ elements chichars_givenname 
+      return (GiveName a)
+                              
+instance Arbitrary UserPrefers where
+    arbitrary = liftM UserPrefers poston
+        where poston = elements ["facebook", "twitter", "plurk", "googleplus"]
 
 userGen :: Int -> [User]
 userGen seed = unGen arbitrary (mkStdGen seed) 9999999
-toCsv lst = encodeByName (V.fromList ["surename", "givename", "prefs"]) (V.fromList lst)
+
+-- JSON 
+instance ToJSON User
+instance ToJSON UserPrefers
+instance ToJSON GiveName where
+    toJSON (GiveName lst) = object ["givename" .= BS.concat lst]
 
 main = do
   args <- getArgs
@@ -61,5 +59,5 @@ main = do
     [un] -> go un 2
   where 
     go un seed = do
-         BL.writeFile "data/kuansim/users.csv" $ toCsv users
+         BL.writeFile "data/kuansim/users.json" $ encode users
              where users = take un $ userGen seed
