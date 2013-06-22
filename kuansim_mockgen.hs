@@ -19,14 +19,20 @@ chichars_givenname = map BSUTF8.fromString $ words "世 中 仁 伶 佩 佳 俊 
 data User = User 
     { surename :: BSUTF8.ByteString
     , givename :: GiveName
+    , email :: Email
     , prefs :: UserPrefers} 
             deriving (Generic, Data,Typeable,Show)
 
 data GiveName = GiveName [BSUTF8.ByteString]
               deriving (Generic, Data,Typeable,Show)
+
+data Email = Email 
+           { id :: String 
+           , host :: String }
+           deriving (Generic, Data, Typeable, Show)
 -- Generator
 instance Arbitrary User where
-    arbitrary = liftM3 User surename arbitrary arbitrary
+    arbitrary = liftM4 User surename arbitrary arbitrary arbitrary
             where surename = elements chichars_surname
 
 data UserPrefers = UserPrefers
@@ -38,6 +44,13 @@ instance Arbitrary GiveName where
       k <- choose (1, 2)
       a <- vectorOf k $ elements chichars_givenname 
       return (GiveName a)
+
+instance Arbitrary Email where
+    arbitrary = do
+                host <- elements ["gmail.com", "yahoo.com", "hotmail.com", "msn.com"]
+                k <- choose (4, 10)
+                id <- vectorOf k $ elements ['a'..'z']
+                return (Email id host)
                               
 instance Arbitrary UserPrefers where
     arbitrary = liftM UserPrefers poston
@@ -49,6 +62,8 @@ userGen seed = unGen arbitrary (mkStdGen seed) 9999999
 -- JSON 
 instance ToJSON User
 instance ToJSON UserPrefers
+instance ToJSON Email where
+    toJSON (Email id host) = object ["email" .= (id ++ "@" ++ host) ]
 instance ToJSON GiveName where
     toJSON (GiveName lst) = object ["givename" .= BS.concat lst]
 
