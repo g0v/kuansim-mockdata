@@ -11,32 +11,23 @@ import Data.Typeable
 import Control.Monad
 import GHC.Generics
 import System.Environment
+import Data.Text.Internal
 
 data User = User
     { name :: UserName
-    , email :: Email 
+    , email :: String
     , date_registered :: DateTime}
     deriving (Generic, Typeable, Show)
 
 instance Arbitrary User where
-    arbitrary = liftM3 User arbitrary arbitrary arbitrary
-
-instance ToJSON User
-
-data Email = Email
-           { id :: String
-           , host :: String }
-           deriving (Generic, Typeable, Show)
-
-instance Arbitrary Email where
-    arbitrary = do
+    arbitrary = liftM3 User arbitrary email arbitrary
+	where email = do
                 host <- elements ["gmail.com", "yahoo.com", "hotmail.com", "msn.com"]
                 k <- choose (4, 10)
                 id <- vectorOf k $ elements ['a'..'z']
-                return (Email id host)
+                return (id ++ "@" ++ host)
 
-instance ToJSON Email where
-    toJSON (Email id host) = object ["email" .= (id ++ "@" ++ host) ]
+instance ToJSON User 
 
 -- User Name
 data UserName = ChineseName
