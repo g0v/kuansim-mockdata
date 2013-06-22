@@ -2,16 +2,17 @@
 import qualified Data.ByteString.UTF8 as BSUTF8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
-import Test.QuickCheck
+import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
-import Data.Aeson
-import Data.DateTime
-import System.Random
-import Data.Typeable
-import Control.Monad
-import GHC.Generics
-import System.Environment
-import Data.Text.Internal
+import Data.Aeson (ToJSON, toJSON, object, encode, (.=))
+import Data.DateTime (DateTime)
+import System.Random 
+import Data.Random
+import Data.Random.Extras
+import Data.Typeable (Typeable)
+import Control.Monad (liftM, liftM2, liftM3)
+import GHC.Generics (Generic)
+import System.Environment (getArgs)
 
 data User = User
     { name :: UserName
@@ -57,10 +58,32 @@ gendata n = take n $ unGen arbitrary (mkStdGen 2) 9999999
 genjson t n = BL.writeFile ("data/kuansim/" ++ t ++ ".json") $ encode $ mkdata t
     where mkdata "users" = gendata n :: [User] 
 
+data Bookmark = Bookmark
+    { user :: User 
+    , resovled_id :: ResolvedItem}
+    deriving (Generic, Typeable, Show)
+
+create_bookmarks users = mk_bookmarks users
+    where pool = load_bookmark_pool 
+          mk_bookmarks [] = []
+          mk_bookmarks (u:us) = (Bookmark u (random_item)) : mk_bookmarks us
+          random_item = undefined
+
+data ResolvedItem = NewsArticle
+    { newsArticleId :: UserName}
+    deriving (Generic, Typeable, Show)
+
+instance Arbitrary ResolvedItem where
+    arbitrary = liftM NewsArticle arbitrary
+
+load_bookmark_pool :: [ResolvedItem]
+load_bookmark_pool = gendata 10
+
 main = do
   args <- getArgs
   case map read args of
     [] -> putStrLn "usage: [user number]"
     [un] -> go un 
   where
-    go un = genjson "users" un
+    go un = print $ create_bookmarks users
+            where users = gendata un :: [User]                  
