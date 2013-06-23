@@ -19,16 +19,18 @@ import System.Environment (getArgs)
 data User = User
     { name :: UserName
     , email :: String
+    , prefer_poston :: String
     , date_registered :: DateTime}
     deriving (Generic, Typeable, Show)
 
 instance Arbitrary User where
-    arbitrary = liftM3 User arbitrary email arbitrary
+    arbitrary = liftM4 User arbitrary email prefer_poston arbitrary
 	where email = do
                 host <- elements ["gmail.com", "yahoo.com", "hotmail.com", "msn.com"]
                 k <- choose (4, 10)
                 id <- vectorOf k $ elements ['a'..'z']
                 return (id ++ "@" ++ host)
+              prefer_poston = elements ["facebook", "googleplus", "twitter", "plurk"]
 
 instance ToJSON User 
 
