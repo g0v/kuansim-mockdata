@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings, DeriveGeneric, DeriveDataTypeable, ScopedTypeVariables #-}
+import Control.Monad.State
 import qualified Data.ByteString.UTF8 as BSUTF8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
@@ -8,9 +9,10 @@ import Data.Aeson (ToJSON, toJSON, object, encode, (.=))
 import Data.DateTime (DateTime)
 import System.Random 
 import Data.Random
+import Data.Random.Source.DevRandom
 import Data.Random.Extras
 import Data.Typeable (Typeable)
-import Control.Monad (liftM, liftM2, liftM3)
+import Control.Monad (liftM, liftM2, liftM3, liftM4, liftM5)
 import GHC.Generics (Generic)
 import System.Environment (getArgs)
 
@@ -59,23 +61,28 @@ genjson t n = BL.writeFile ("data/kuansim/" ++ t ++ ".json") $ encode $ mkdata t
     where mkdata "users" = gendata n :: [User] 
 
 data Bookmark = Bookmark
-    { user :: User 
-    , resovled_id :: ResolvedItem}
+    { author :: User 
+    , resolved_item :: ResolvedItem
+    , date_resovled :: DateTime
+    , in_inbox :: Bool}
     deriving (Generic, Typeable, Show)
 
-create_bookmarks users = mk_bookmarks users
-    where pool = load_bookmark_pool 
-          mk_bookmarks [] = []
-          mk_bookmarks (u:us) = (Bookmark u (random_item)) : mk_bookmarks us
-          random_item = undefined
+instance Arbitrary Bookmark where
+    arbitrary = liftM4 Bookmark arbitrary arbitrary arbitrary opt_in_inbox
+                where opt_in_inbox = (frequency [(9, arbitrary), (1, arbitrary)])
 
-data ResolvedItem = NewsArticle
-    { newsArticleId :: UserName}
+data ResolvedItem = ResolvedItem
+    { resovled_type :: String
+    , resolved_type :: Int}
     deriving (Generic, Typeable, Show)
 
 instance Arbitrary ResolvedItem where
-    arbitrary = liftM NewsArticle arbitrary
-
+    arbitrary = do
+      _type <- elements ["news_article"]
+      _id <- case _type of 
+               "news_article" -> choose (2, 163151)
+      return (ResolvedItem _type _id)
+               
 load_bookmark_pool :: [ResolvedItem]
 load_bookmark_pool = gendata 10
 
@@ -85,5 +92,4 @@ main = do
     [] -> putStrLn "usage: [user number]"
     [un] -> go un 
   where
-    go un = print $ create_bookmarks users
-            where users = gendata un :: [User]                  
+    go un = genjson "users" un
