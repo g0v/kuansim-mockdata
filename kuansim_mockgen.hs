@@ -9,10 +9,12 @@ import Data.Aeson (ToJSON, toJSON, object, encode, (.=))
 import Data.DateTime (DateTime)
 import System.Random 
 import Data.Random
+import qualified Data.Csv as Csv
+import qualified Data.Vector as V
 import Data.Random.Source.DevRandom
 import Data.Random.Extras
 import Data.Typeable (Typeable)
-import Control.Monad (liftM, liftM2, liftM3, liftM4, liftM5)
+import Control.Monad 
 import GHC.Generics (Generic)
 import System.Environment (getArgs)
 
@@ -58,12 +60,6 @@ instance ToJSON UserName where
     toJSON (ChineseName s g) = object ["surname" .= s
                                       , "givenname" .= concat g]
 
-gendata n = take n $ unGen arbitrary (mkStdGen 2) 9999999
-
-genjson :: String -> Int -> IO ()
-genjson t n = BL.writeFile ("data/kuansim/" ++ t ++ ".json") $ encode $ mkdata t
-    where mkdata "users" = gendata n :: [User] 
-          mkdata _ = error "unsupported type"
 
 data Bookmark = Bookmark
     { author :: User 
@@ -93,8 +89,33 @@ load_bookmark_pool = gendata 10
 
 usage = "usage: entry_type numner"
 
+gennews done = do
+  csvData <- BL.readFile "articles.csv"
+  case Csv.decode False csvData of
+    Left err -> putStrLn err
+    Right v -> done . encode $ V.map as_json v
+        where as_json = (\ (id :: Int
+                        , title :: String
+                        , url :: String 
+                        , source :: String
+                        , _ :: String
+                        , d1 :: String
+                        , d2 :: String) -> object ["_id" .= id,
+                                                  "title" .= title,
+                                                  "url" .= url,
+                                                  "source" .= source ])
+
+gendata n = take n $ unGen arbitrary (mkStdGen 2) 9999999
+
+genjson t n = mkdata t
+    where mkdata "users" = save . encode $ (gendata n :: [User])
+          mkdata "news" = gennews save
+          mkdata _ = error "unsupported type"
+          save = BL.writeFile ("data/kuansim/" ++ t ++ ".json")
+
 main = do
   args <- getArgs
-  case map read args of
-    [t, un] -> genjson "users" un
-    _ -> putStrLn usage
+  case args of
+    []        -> putStrLn "serial <number of serials> [seed]"
+    ["users", n]    -> genjson "users" (read n)
+    ["news"]        -> genjson "news" 0
