@@ -59,8 +59,11 @@ instance ToJSON UserName where
                                       , "givenname" .= concat g]
 
 gendata n = take n $ unGen arbitrary (mkStdGen 2) 9999999
+
+genjson :: String -> Int -> IO ()
 genjson t n = BL.writeFile ("data/kuansim/" ++ t ++ ".json") $ encode $ mkdata t
     where mkdata "users" = gendata n :: [User] 
+          mkdata _ = error "unsupported type"
 
 data Bookmark = Bookmark
     { author :: User 
@@ -88,10 +91,10 @@ instance Arbitrary ResolvedItem where
 load_bookmark_pool :: [ResolvedItem]
 load_bookmark_pool = gendata 10
 
+usage = "usage: entry_type numner"
+
 main = do
   args <- getArgs
   case map read args of
-    [] -> putStrLn "usage: [user number]"
-    [un] -> go un 
-  where
-    go un = genjson "users" un
+    [t, un] -> genjson "users" un
+    _ -> putStrLn usage
